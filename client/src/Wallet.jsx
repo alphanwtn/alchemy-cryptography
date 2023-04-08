@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import server from "./server";
+
+import { getPublicKey } from "ethereum-cryptography/secp256k1";
+import { toHex, bytesToHex, utf8ToBytes } from "ethereum-cryptography/utils";
 
 function Wallet({
   address,
@@ -9,34 +12,49 @@ function Wallet({
   privateKey,
   setPrivateKey,
 }) {
-  async function onChangePublicKey(evt) {
-    const address = evt.target.value;
-    setAddress(address);
-    if (address) {
+  async function getAddressAndBalance() {
+    let publicKey = "";
+
+    try {
+      publicKey = bytesToHex(getPublicKey(privateKey.slice(2)));
+      setAddress(`0x${publicKey}`);
       const {
         data: { balance },
       } = await server.get(`balance/${address}`);
       setBalance(balance);
-    } else {
+    } catch (err) {
+      setAddress("Invalid private key");
       setBalance(0);
     }
   }
 
-  function onChangePrivateKey(evt) {
+  async function onChangePrivateKey(evt) {
     const key = evt.target.value;
     setPrivateKey(key);
   }
 
+  useEffect(() => {
+    getAddressAndBalance();
+  }, [privateKey, address]);
+
+  const borderObject = (() => {
+    if (address === "Invalid private key") {
+      return { borderColor: "red" };
+    } else {
+      return { borderColor: "green" };
+    }
+  })();
+
   return (
-    <div className="container wallet">
+    <div className="container wallet" style={borderObject}>
       <h1>Your Wallet</h1>
 
       <label>
-        Wallet Address
+        Wallet Address (auto generated)
         <input
           placeholder="Type an address, for example: 0x1"
           value={address}
-          onChange={onChangePublicKey}
+          disabled
         ></input>
       </label>
 
