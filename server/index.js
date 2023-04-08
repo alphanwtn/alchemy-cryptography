@@ -3,7 +3,11 @@ const app = express();
 const cors = require("cors");
 const port = 3042;
 const secp = require("ethereum-cryptography/secp256k1");
-const { bytesToHex, hexToBytes } = require("ethereum-cryptography/utils");
+const {
+
+  utf8ToBytes,
+} = require("ethereum-cryptography/utils");
+const { keccak256 } = require("ethereum-cryptography/keccak");
 
 app.use(cors());
 app.use(express.json());
@@ -24,17 +28,27 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", (req, res) => {
-  const { sender, senderPrivate, recipient, amount } = req.body;
+  const { sender, amount, recipient, senderSignature } = req.body;
+
+  const transactionData = { sender, amount, recipient };
+
+  const hashedTransaction = keccak256(
+    utf8ToBytes(JSON.stringify(transactionData))
+  );
+
+  const isSigned = secp.verify(
+    senderSignature,
+    hashedTransaction,
+    sender.slice(2)
+  );
 
   setInitialBalance(sender);
   setInitialBalance(recipient);
 
   if (balances[sender] < amount) {
     res.status(400).send({ message: "Not enough funds!" });
-  } else if (
-    sender.slice(2) !== bytesToHex(secp.getPublicKey(senderPrivate.slice(2)))
-  ) {
-    res.status(400).send({ message: "Private key not valid !!" });
+  } else if (!isSigned) {
+    res.status(400).send({ message: "Signature not valid !!" });
   } else {
     balances[sender] -= amount;
     balances[recipient] += amount;
